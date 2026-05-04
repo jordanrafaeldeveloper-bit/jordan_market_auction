@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  ENDED_UNSOLD
+  SOLD
+  CANCELLED
+}
+
+enum SalesMethod {
+  AUCTION_ONLY
+  BUY_NOW_ONLY
+  BOTH
+}
+
+enum OrderType {
+  AUCTION_WIN
+  BUY_NOW
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentRecordStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model User {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  passwordHash     String
+  name             String
+  phone            String?
+  role             Role     @default(USER)
+  sellerRatingAvg  Float    @default(0)
+  buyerRatingAvg   Float    @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  listings     Listing[] @relation("SellerListings")
+  bids         Bid[]
+  ordersBuy    Order[]   @relation("BuyerOrders")
+  ordersSell   Order[]   @relation("SellerOrders")
+  reviewsGiven Review[]  @relation("ReviewsFrom")
+  reviewsRecv  Review[]  @relation("ReviewsTo")
+}
+
+model CommissionSettings {
+  id         String   @id @default("default")
+  mode       String   @default("PERCENTAGE")
+  percentage Float    @default(5)
+  fixedCents Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}
+
+model Listing {
+  id                String        @id @default(cuid())
+  sellerId          String
+  seller            User          @relation("SellerListings", fields: [sellerId], references: [id])
+
+  title             String
+  description       String
+  images            Json          @default("[]")
+
+  minPriceCents     Int
+  buyNowPriceCents  Int?
+  bidIncrementCents Int           @default(100)
+
+  salesMethod       SalesMethod
+  status            ListingStatus @default(DRAFT)
+
+  auctionEndsAt   DateTime?
+  autoRelist      Boolean   @default(true)
+  relistCount     Int       @default(0)
+  parentListingId String?
+
+  currentBidCents   Int?
+  leaderUserId      String?
+  leaderMaxBidCents Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bids   Bid[]
+  orders Order[]
+
+  @@index([status])
+  @@index([auctionEndsAt])
+}
+
+model Bid {
+  id          String   @id @default(cuid())
+  listingId   String
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  bidderId    String
+  bidder      User     @relation(fields: [bidderId], references: [id])
+  amountCents Int
+  maxBidCents Int
+  createdAt   DateTime @default(now())
+
+  @@index([listingId])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  listingId     String
+  listing       Listing     @relation(fields: [listingId], references: [id])
+  buyerId       String
+  buyer         User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  sellerId      String
+  seller        User        @relation("SellerOrders", fields: [sellerId], references: [id])
+  type          OrderType
+  status        OrderStatus @default(PENDING_PAYMENT)
+  saleAmountCents   Int
+  commissionCents   Int
+  sellerPayoutCents Int
+  paymentMethod     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  paidAt        DateTime?
+
+  payments PaymentRecord[]
+  reviews  Review[]
+
+  @@index([status])
+  @@index([buyerId])
+  @@index([sellerId])
+}
+
+model PaymentRecord {
+  id          String              @id @default(cuid())
+  orderId     String
+  order       Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider    String
+  externalId  String?
+  status      PaymentRecordStatus @default(PENDING)
+  rawPayload  String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([orderId])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromUserId String
+  fromUser   User     @relation("ReviewsFrom", fields: [fromUserId], references: [id])
+  toUserId   String
+  toUser     User     @relation("ReviewsTo", fields: [toUserId], references: [id])
+  rating     Int
+  comment    String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@unique([orderId, fromUserId])
+}
+
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
