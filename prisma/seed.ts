@@ -1,6 +1,7 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import {
   PrismaClient,
   Role,
@@ -8,9 +9,14 @@ import {
   SalesMethod,
 } from "../src/generated/prisma/client";
 
-const url = process.env.DATABASE_URL ?? "file:./dev.db";
-const adapter = new PrismaBetterSqlite3({ url });
-const prisma = new PrismaClient({ adapter });
+const url = process.env.DATABASE_URL;
+if (!url) {
+  console.error("DATABASE_URL is required for seeding.");
+  process.exit(1);
+}
+
+const pool = new Pool({ connectionString: url });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 async function main() {
   await prisma.commissionSettings.upsert({
@@ -79,9 +85,13 @@ async function main() {
 }
 
 main()
-  .then(() => prisma.$disconnect())
-  .catch((e) => {
+  .then(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  })
+  .catch(async (e) => {
     console.error(e);
-    prisma.$disconnect();
+    await prisma.$disconnect();
+    await pool.end();
     process.exit(1);
   });

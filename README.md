@@ -6,30 +6,38 @@ Next.js marketplace for **physical items** with **live auctions** (countdown, 5-
 
 - Node.js 20+
 - npm
+- **PostgreSQL** (local Docker, [Neon](https://neon.tech), Vercel Postgres, Supabase, etc.). The app does **not** use SQLite on Vercel.
 
 ## Installation
 
-1. Copy environment variables:
+1. Create a Postgres database and copy its connection string.
+
+2. Copy environment variables:
 
    ```bash
    cp .env.example .env
    ```
 
-   Set `AUTH_SECRET` (e.g. `openssl rand -base64 32`), `CRON_SECRET`, and payment keys as needed.
+   Edit `.env`:
 
-2. Install and generate the Prisma client:
+   - `DATABASE_URL` — your `postgresql://…` URL (with `sslmode=require` for cloud hosts).
+   - `AUTH_SECRET` — e.g. `openssl rand -base64 32`.
+   - `NEXTAUTH_URL` — `http://localhost:3000` locally; on Vercel set to `https://YOUR-PROJECT.vercel.app`.
+   - `CRON_SECRET`, payment keys, etc. as needed.
+
+3. Install and generate the Prisma client:
 
    ```bash
    npm install
    ```
 
-3. Create / migrate the database (SQLite file `dev.db` in project root by default):
+4. Apply migrations:
 
    ```bash
    npx prisma migrate deploy
    ```
 
-4. Seed demo users and a sample listing:
+5. Seed demo users and a sample listing:
 
    ```bash
    npm run db:seed
@@ -39,7 +47,7 @@ Next.js marketplace for **physical items** with **live auctions** (countdown, 5-
    - Seller: `seller@example.com` / `User123456!`
    - Buyer: `buyer@example.com` / `User123456!`
 
-5. Run the app:
+6. Run the app:
 
    ```bash
    npm run dev
@@ -47,11 +55,24 @@ Next.js marketplace for **physical items** with **live auctions** (countdown, 5-
 
    Open [http://localhost:3000](http://localhost:3000).
 
+## Deploy on Vercel
+
+The previous “server error” on Vercel was almost certainly **SQLite + `better-sqlite3`**, which do not work on Vercel’s serverless runtime. This repo now uses **PostgreSQL + `pg`**.
+
+1. In Neon (or another host), create a database and copy the **pooled** connection string for `DATABASE_URL`.
+2. In the Vercel project → **Settings → Environment Variables**, add at least:
+   - `DATABASE_URL`
+   - `AUTH_SECRET`
+   - `NEXTAUTH_URL` = `https://<your-deployment>.vercel.app`
+   - `NEXT_PUBLIC_SITE_URL` = same as `NEXTAUTH_URL` (for emails/checkout return URLs)
+   - `CRON_SECRET` (and optional payment/SMTP vars)
+3. Redeploy. The included `vercel.json` runs **`prisma migrate deploy` then `next build`** so tables are created on build.
+4. After the first successful deploy, run seed once from your machine (with production `DATABASE_URL` in env) or use Neon SQL / a one-off script: `npm run db:seed`.
+
 ## Production notes
 
-- Switch `DATABASE_URL` to **PostgreSQL** (recommended): change `provider` in `prisma/schema.prisma`, run migrations, and use a Postgres-compatible Prisma adapter per [Prisma 7 docs](https://www.prisma.io/docs).
 - Set strong `AUTH_SECRET`, disable `ALLOW_SIMULATE_PAY`, configure SMTP for transactional mail.
-- Schedule `GET /api/cron/close-auctions?secret=YOUR_CRON_SECRET` every minute (or use Vercel Cron / systemd) so ended auctions create orders, send emails, and relist when reserve is not met.
+- Schedule `GET /api/cron/close-auctions?secret=YOUR_CRON_SECRET` every minute (Vercel Cron or external ping) so ended auctions create orders, send emails, and relist when reserve is not met.
 
 ## Admin panel
 
