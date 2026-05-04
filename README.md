@@ -66,7 +66,7 @@ The previous “server error” on Vercel was almost certainly **SQLite + `bette
    - `NEXTAUTH_URL` = `https://<your-deployment>.vercel.app`
    - `NEXT_PUBLIC_SITE_URL` = same as `NEXTAUTH_URL` (for emails/checkout return URLs)
    - `CRON_SECRET` (and optional payment/SMTP vars)
-3. Redeploy. The included `vercel.json` runs **`prisma migrate deploy` then `next build`** so tables are created on build.
+3. Redeploy. The included `vercel.json` runs **`prisma migrate deploy` then `next build`** so tables are created on build. (`npm install` runs `prisma generate` before env vars exist on Vercel; `prisma.config.ts` uses a placeholder URL only for that step—your real `DATABASE_URL` is still required for **`migrate deploy`** during the build.)
 4. After the first successful deploy, run seed once from your machine (with production `DATABASE_URL` in env) or use Neon SQL / a one-off script: `npm run db:seed`.
 
 ## Production notes
