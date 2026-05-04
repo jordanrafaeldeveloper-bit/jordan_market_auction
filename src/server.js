@@ -1,29 +1,19 @@
 require("dotenv").config();
-const express = require("express");
-
 const connectDB = require("./config/db");
-const auctionRoutes = require("./routes/auction.route");
-const authRoutes = require("./routes/auth.route");
+const app = require("./app");
 
-const app = express();
-app.use(express.json());
-
-//routes
-app.use("/api/auctions", auctionRoutes);
-app.use("/api/auth", authRoutes);
-
-//server
 const PORT = process.env.PORT || 5000;
 
-(async () => {
-  try {
-    // Connect to MongoDB
-    await connectDB();
+if (require.main === module) {
+  (async () => {
+    try {
+      await connectDB();
+      app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    } catch (error) {
+      console.error(error.message);
+      process.exit(1);
+    }
+  })();
+}
 
-    // Start the server
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-    console.log("Server running on port " + PORT);
-  } catch (error) {
-    console.error(error.message);
-  }
-})();
+module.exports = app;
